@@ -61,7 +61,9 @@ app.post("/signup", (req, res) => {
     joined: new Date()
   };
   database.users.push(newUser);
-  res.json(database.users.at(-1));
+  let signedUpUser = JSON.parse(JSON.stringify(newUser));
+  delete signedUpUser.password;
+  res.json(signedUpUser);
 });
 
 app.get("/profile/:id", (req, res) => {
