@@ -38,7 +38,7 @@ app.get("/", (req, res) => {
 
 app.post("/signin", (req, res) => {
   let found = false;
-  database.users.forEach((user) => {
+  database.users.some((user) => {
     if (req.body.email == user.email && req.body.password == user.password) {
       found = true;
       return res.json(user);
@@ -66,13 +66,28 @@ app.post("/signup", (req, res) => {
   res.json(signedUpUser);
 });
 
-app.get("/profile/:id", (req, res) => {
+app.get("/user/:id", (req, res) => {
   const { id } = req.params;
   let found = false;
-  database.users.forEach((user) => {
-    if (user.id == id) {
+  database.users.some((user) => {
+    if (user.id === Number(id)) {
       found = true;
       return res.json(user);
+    }
+  });
+  if (!found) {
+    res.status(404).json("No such user found")
+  }
+});
+
+app.put("/user/:id/entries", (req, res) => {
+  const { id } = req.params;
+  let found = false;
+  database.users.some((user) => {
+    if (user.id === Number(id)) {
+      found = true;
+      user.entries++;
+      return res.json({ entries: user.entries });
     }
   });
   if (!found) {
