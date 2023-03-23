@@ -1,5 +1,17 @@
 const express = require("express");
 const cors = require("cors");
+const knex = require("knex");
+
+const db = knex({
+  client: "pg",
+  connection: {
+    host: "127.0.0.1",
+    port: "5432",
+    user: "postgres",
+    password: "Test@123",
+    database: "face_recognizer"
+  }
+});
 
 const database = {
   users: [
@@ -51,19 +63,33 @@ app.post("/signin", (req, res) => {
 
 app.post("/signup", (req, res) => {
   const { name, email, password } = req.body;
-  const id = database.users.at(-1).id + 1;
-  let newUser = {
-    id: id,
-    name: name,
-    email: email,
-    password: password,
-    entries: 0,
-    joined: new Date()
-  };
-  database.users.push(newUser);
-  let signedUpUser = JSON.parse(JSON.stringify(newUser));
-  delete signedUpUser.password;
-  res.json(signedUpUser);
+  // const id = database.users.at(-1).id + 1;
+  // let newUser = {
+  //   id: id,
+  //   name: name,
+  //   email: email,
+  //   password: password,
+  //   entries: 0,
+  //   joined: new Date()
+  // };
+  // database.users.push(newUser);
+  // let signedUpUser = JSON.parse(JSON.stringify(newUser));
+  // delete signedUpUser.password;
+  // res.json(signedUpUser);
+  db
+    .returning("*")
+    .insert({
+      name: name,
+      email: email,
+      joined: new Date
+    })
+    .into("users")
+    .then(user => {
+      res.json(user[0])
+    })
+    .catch((err) => {
+      res.json("Something went wrong")
+    });
 });
 
 app.get("/user/:id", (req, res) => {
