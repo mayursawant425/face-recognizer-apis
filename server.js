@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const bcrypt = require("bcrypt");
 const knex = require("knex");
 
 const db = knex({
@@ -49,74 +50,105 @@ app.get("/", (req, res) => {
 });
 
 app.post("/signin", (req, res) => {
-  let found = false;
-  database.users.some((user) => {
-    if (req.body.email == user.email && req.body.password == user.password) {
-      found = true;
-      return res.json(user);
-    }
-  });
-  if (!found) {
-    res.status(404).json("Incorrect Username Password");
-  }
-});
-
-app.post("/signup", (req, res) => {
-  const { name, email, password } = req.body;
-  // const id = database.users.at(-1).id + 1;
-  // let newUser = {
-  //   id: id,
-  //   name: name,
-  //   email: email,
-  //   password: password,
-  //   entries: 0,
-  //   joined: new Date()
-  // };
-  // database.users.push(newUser);
-  // let signedUpUser = JSON.parse(JSON.stringify(newUser));
-  // delete signedUpUser.password;
-  // res.json(signedUpUser);
+  // let found = false;
+  // database.users.some((user) => {
+  //   if (req.body.email == user.email && req.body.password == user.password) {
+  //     found = true;
+  //     return res.json(user);
+  //   }
+  // });
+  // if (!found) {
+  //   res.status(404).json("Incorrect Username Password");
+  // }
+  const { email, password } = req.body;
   db
-    .returning("*")
-    .insert({
-      name: name,
-      email: email,
-      joined: new Date
-    })
-    .into("users")
-    .then(user => {
-      res.json(user[0])
+    .select("*")
+    .from("login")
+    .where({ email: email })
+    .then(async (user) => {
+      const isValid = await bcrypt.compare(password, user[0].hash);
+      if (isValid) {
+        db
+          .select("*")
+          .from("users")
+          .where({ email: email })
+          .then((signedInUser) => {
+            res.json(signedInUser[0]);
+          })
+          .catch((err) => {
+            res.status(404).json("Something went wrong");
+          });
+      }
+      else {
+        res.status(401).json("Incorrect Username Password");
+      }
     })
     .catch((err) => {
-      res.json("Something went wrong")
+      res.status(404).json("Something went wrong");
+    });
+});
+
+app.post("/signup", async (req, res) => {
+  const { name, email, password } = req.body;
+  const hash = await bcrypt.hash("test@123", 13);
+  console.log(hash);
+  db.transaction((trx) => {
+    trx
+      .insert({
+        email: email,
+        hash: hash
+      })
+      .into("login")
+      .then(() => {
+        trx
+          .insert({
+            name: name,
+            email: email,
+            joined: new Date
+          })
+          .into("users")
+          .returning("*")
+          .then((user) => {
+            res.json(user[0]);
+          });
+      })
+      .then(trx.commit)
+      .catch(trx.rollback);
+  })
+    .catch((err) => {
+      res.status(400).json("Something went wrong");
     });
 });
 
 app.get("/user/:id", (req, res) => {
   const { id } = req.params;
-  let found = false;
-  database.users.some((user) => {
-    if (user.id === Number(id)) {
-      found = true;
-      return res.json(user);
-    }
-  });
-  if (!found) {
-    res.status(404).json("No such user found")
-  }
+  db
+    .select("*")
+    .from("users")
+    .where({ id: id })
+    .then((user) => {
+      if (user.length) {
+        res.json(user[0]);
+      }
+      else {
+        res.status(404).json("User not found");
+      }
+    })
+    .catch((err) => {
+      res.status(400).json("Something went wrong");
+    });
 });
 
 app.put("/user/:id/entries", (req, res) => {
   const { id } = req.params;
-  let found = false;
-  database.users.some((user) => {
-    if (user.id === Number(id)) {
-      found = true;
-      user.entries++;
-      return res.json({ entries: user.entries });
-    }
-  });
-  if (!found) {
-    res.status(404).json("No such user found")
-  }
+  db("users")
+    .where({ id: id })
+    .increment("entries")
+    .returning("entries")
+    .then(entries => {
+      res.json(entries[0]);
+    })
+    .catch((err) => {
+      res.status(400).json("Something went wrong");
+    })
 });
